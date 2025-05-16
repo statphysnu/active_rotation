@@ -8,12 +8,12 @@ import sys
 
 
 
-class active_fluid:
+class active_fluid:     # OOP
     """basic model to simulate active RTP + Noise fluid interacting with passive object"""
 
      # initializing coefficients of model and configuration of states in phase space
 
-    def __init__(self,alpha=1, u=10,Fs=100, N_ptcl=40000,N_passive = 2, mu=1,Dt = 1):
+    def __init__(self,alpha=1, u=10,Fs=100, N_ptcl=40000,N_passive = 1, mu=1,Dt = 1):
 
         self.initial_state = (alpha,u,Fs,N_ptcl,mu,Dt)    # recording initial state
          # coefficients
@@ -29,7 +29,7 @@ class active_fluid:
 
 
      # setting coefficients
-    def set_coeff(self,alpha=1, u=10,Fs=100, N_ptcl=40000,N_passive = 2, mu=1,Dt = 1):
+    def set_coeff(self,alpha=1, u=10,Fs=100, N_ptcl=40000,N_passive = 1, mu=1,Dt = 1):
         self.alpha = alpha                       # rate of tumble (/time dimension)
         self.u = u                               # velocity of active particle
         self.Fs = Fs                             # number of simulation in unit time
@@ -47,12 +47,16 @@ class active_fluid:
         self.lamb = 2.0
         self.N_body = 13
         self.l_passive = 10
+        self.N_passive = N_passive
 
         # passive object movement
         self.mu_T = 0.01
         self.mu_R = np.array([0.3,0.3])
-        self.RA = np.array([0,self.R])
+#         self.RA = np.array([0,self.R])
 
+        
+        self.mu_R = np.array([0.3])
+#         self.RA = np.array([self.R])
 
     # check coefficients for linearization condition
     def check_coeff(self):
@@ -71,22 +75,22 @@ class active_fluid:
 
         return (mod_x,mod_y)
 
-    def V(self,x,y,X,Y,Theta):                                         # V as function of x-X (relative position w r t object)
-        (rel_x,rel_y) = self.periodic(x-X,y-Y)
-        thetas = np.linspace(-np.pi/2,np.pi/2,self.N_body)+Theta
-        centerX = np.cos(thetas)
-        centerY = np.sin(thetas)
+#     def V(self,x,y,X,Y,Theta):                                         # V as function of x-X (relative position w r t object)
+#         (rel_x,rel_y) = self.periodic(x-X,y-Y)
+#         thetas = np.linspace(-np.pi/2,np.pi/2,self.N_body)+Theta
+#         centerX = np.cos(thetas)
+#         centerY = np.sin(thetas)
 
-        interact = (np.square(centerX-rel_x)+np.square(centerY-rel_y)<self.Rb**2)  # boolean 
-        strength = 0.5*self.lamb*np.square(self.Rb-np.sqrt(np.square(centerX-rel_x)+np.square(centerY-rel_y)))
+#         interact = (np.square(centerX-rel_x)+np.square(centerY-rel_y)<self.Rb**2)  # boolean 
+#         strength = 0.5*self.lamb*np.square(self.Rb-np.sqrt(np.square(centerX-rel_x)+np.square(centerY-rel_y)))
 
-        return np.sum(interact*strength)
+#         return np.sum(interact*strength)
 
 
 
     def force(self):
 
-        # axis 0 for active, axis 1 for passive, axis 2 for bodies in passive object
+        # axis 0 for active, axis 1 for passive, axis 3 for bodies in passive object
 
         # for 2 passive particles fixed
         x     = self.x.reshape(-1,1,1)
@@ -99,19 +103,20 @@ class active_fluid:
         
 
         (rel_x,rel_y) = self.periodic(x-X,y-Y)
-        thetas = np.linspace(-np.pi/2,np.pi/2,self.N_body).reshape(1,1,-1)+Theta
+        # thetas = np.linspace(-np.pi/2,np.pi/2,self.N_body).reshape(1,1,-1)+Theta
 #         centerX = self.R*np.cos(thetas)
 #         centerY = self.R*np.sin(thetas)
-        RA = self.RA.reshape(-1,1)
-        centerX = self.R*np.cos(thetas)-RA*np.cos(self.Theta.reshape(-1,1))
-        centerY = self.R*np.sin(thetas)-RA*np.sin(self.Theta.reshape(-1,1))
+#         RA = np.array(self.R).reshape(-1,1)
+        (centerX,centerY)=self.config()
+        # centerX = self.R*np.cos(thetas)-RA*np.cos(self.Theta.reshape(-1,1))
+        # centerY = self.R*np.sin(thetas)-RA*np.sin(self.Theta.reshape(-1,1))
 
         length = np.sqrt(np.square(centerX-rel_x)+np.square(centerY-rel_y))
         direcX = (centerX-rel_x)/length
         direcY = (centerY-rel_y)/length
 
         interact = (length<self.Rb)  # boolean 
-        strengthX = self.lamb*interact*direcX*(self.Rb-length)    # harmonic potential
+        strengthX = self.lamb*interact*direcX*(self.Rb-length)
         strengthY = self.lamb*interact*direcY*(self.Rb-length)
 
         F_active  = (-np.sum(np.sum(strengthX,axis=2),axis=1),-np.sum(np.sum(strengthY,axis=2),axis=1))      #sum over bodies, sum over objects
@@ -120,8 +125,8 @@ class active_fluid:
         # sum over active particles, sum over bodies
         # positive torque for counter-clockwise acceleration
 
-#         return (F_active,F_passive, torque)     # F_active ~ -partialV
-        return (F_active, torque)     # F_active ~ -partialV
+        return (F_active,F_passive, torque)     # F_active ~ -partialV
+#         return (F_active, torque)     # F_active ~ -partialV
 
 
 
@@ -129,14 +134,19 @@ class active_fluid:
 
     # Dynamics part
     def set_zero(self):              # initializing simulation configurations
-        self.x = np.random.uniform(-self.L/2, self.L/2,self.N_ptcl)     # starting with uniformly distributed particles
-        self.y = np.random.uniform(-self.L/2, self.L/2,self.N_ptcl)     
+        # self.x = np.random.uniform(-self.L/2, self.L/2,self.N_ptcl)     # starting with uniformly distributed particles
+        # self.y = np.random.uniform(-self.L/2, self.L/2,self.N_ptcl) 
+        self.x = np.random.uniform(self.R*2, self.L-self.R*2,self.N_ptcl)     # starting with uniformly distributed particles
+        self.y = np.random.uniform(self.R*2, self.L-self.R*2,self.N_ptcl)
         self.theta = np.random.uniform(-np.pi/2, np.pi/2,self.N_ptcl)
 
-        self.X = np.array([-self.l_passive/2,self.l_passive/2])
-        self.Y = np.array([0,0])     
-#         self.Theta = np.random.uniform(-np.pi, np.pi,self.N_passive)
-        self.Theta = np.random.uniform(-np.pi, np.pi,2)
+        # self.X = np.array([-self.l_passive/2,self.l_passive/2])
+        # self.Y = np.array([0,0])     
+        self.X = np.array([0.])
+        self.Y = np.array([0.])  
+        
+        self.Theta = np.random.uniform(-np.pi, np.pi,self.N_passive)
+        # self.Theta = np.random.uniform(-np.pi, np.pi,2)
 
     def tumble(self):             # random part of s dynamics
         tumble = np.random.choice([0,1], self.N_ptcl, p = [1-self.dt*self.alpha, self.dt*self.alpha]) # 0 no tumble, 1 tumble
@@ -144,11 +154,11 @@ class active_fluid:
 
 
     def time_evolve(self):
-#         F_active,F_passive,torque = self.force()
-        F_active,torque = self.force()
+        F_active,F_passive,torque = self.force()
+#         F_active,torque = self.force()
 
         # active fluid
-#         self.theta       +=  np.sqrt(2*self.Dt*self.dt)*np.random.normal(0,1,self.N_ptcl)    # thermal noise
+        # self.theta       +=  np.sqrt(2*self.Dt*self.dt)*np.random.normal(0,1,self.N_ptcl)    # thermal noise
         self.theta       +=  np.random.uniform(-np.pi, np.pi,self.N_ptcl)*self.tumble()      # tumbling noise
         self.x           +=  self.dt*(self.u*(np.cos(self.theta))+self.mu*F_active[0])       # deterministic
         self.x           +=  np.sqrt(2*self.Dt*self.dt)*np.random.normal(0,1,self.N_ptcl)    # thermal noise
@@ -156,16 +166,14 @@ class active_fluid:
         self.y           +=  np.sqrt(2*self.Dt*self.dt)*np.random.normal(0,1,self.N_ptcl)    # thermal noise
 
         # passive object
+#         print(type(self.X))
 #         self.X           += self.dt*self.mu_T*F_passive[0]
 #         self.Y           += self.dt*self.mu_T*F_passive[1]
-        if self.dynamic:
-            self.Theta       += self.dt*self.mu_R*torque   # overdamped dynamics
-        else:
-            #protocol for perturbation, measure torque in time
+        self.Theta       += self.dt*self.mu_R*torque
 
         # periodic boundary
         self.x,self.y = self.periodic(self.x,self.y)
-#         self.X,self.Y = self.periodic(self.X,self.Y)
+        self.X,self.Y = self.periodic(self.X,self.Y)
 
     def simulate(self,N_iter):
         traj = np.empty([self.N_passive,3,N_iter])
@@ -177,7 +185,7 @@ class active_fluid:
         return traj
 
 
-    def config(self):    #gives position of body particles given angle
+    def config(self):
         
 #         axrange = [-self.L/2, self.L/2, -self.L/2, self.L/2]
 
@@ -191,14 +199,64 @@ class active_fluid:
 #         if record:
 #             os.makedirs(os.getcwd()+'/record',exist_ok=True)
 
-        thetas = np.linspace(-np.pi/2,np.pi/2,self.N_body).reshape(1,-1)+self.Theta.reshape(-1,1)
-        RA = self.RA.reshape(-1,1)
-        centerX = self.R*np.cos(thetas)-RA*np.cos(self.Theta.reshape(-1,1))
-        centerY = self.R*np.sin(thetas)-RA*np.sin(self.Theta.reshape(-1,1))
 
-        pointX = (self.X.reshape(-1,1)+centerX).reshape(-1)
-        pointY = (self.Y.reshape(-1,1)+centerY).reshape(-1)
-        return (pointX, pointY)
+#         #U shape
+#         thetas = np.linspace(-np.pi/3,np.pi/3,self.N_body).reshape(1,-1)+self.Theta.reshape(-1,1)
+#         RA = self.RA.reshape(-1,1)
+        
+#         centerX = self.R*np.cos(thetas)-RA*np.cos(self.Theta.reshape(-1,1))
+#         centerY = self.R*np.sin(thetas)-RA*np.sin(self.Theta.reshape(-1,1))
+
+#         #WEDGE
+#         line = np.linspace(0,self.RA,self.N_body).reshape(1,-1)
+#         X1 = line*np.cos(self.Theta.reshape(-1,1)+self.thetaW/6)
+#         Y1 = line*np.sin(self.Theta.reshape(-1,1)+self.thetaW/6)
+
+#         X2 = line*np.cos(self.Theta.reshape(-1,1)-self.thetaW/6)
+#         Y2 = line*np.sin(self.Theta.reshape(-1,1)-self.thetaW/6)
+        
+#         centerX = np.concatenate([X1,X2],axis=1)
+#         centerY = np.concatenate([Y1,Y2],axis=1)
+
+#         #GEAR 6
+#         thetas = np.linspace(-np.pi/3,np.pi/3,self.N_body).reshape(1,-1)+self.Theta.reshape(-1,1)
+#         RA = self.RA.reshape(-1,1)
+        
+#         X1 = self.R*np.cos(thetas)-RA*np.cos(self.Theta.reshape(-1,1))
+#         Y1 = self.R*np.sin(thetas)-RA*np.sin(self.Theta.reshape(-1,1))
+#         X2 = self.R*np.cos(thetas+np.pi/3)-RA*np.cos(self.Theta.reshape(-1,1)+np.pi/3)
+#         Y2 = self.R*np.sin(thetas+np.pi/3)-RA*np.sin(self.Theta.reshape(-1,1)+np.pi/3)
+#         X3 = self.R*np.cos(thetas-np.pi/3)-RA*np.cos(self.Theta.reshape(-1,1)-np.pi/3)
+#         Y3 = self.R*np.sin(thetas-np.pi/3)-RA*np.sin(self.Theta.reshape(-1,1)-np.pi/3)
+#         X4 = self.R*np.cos(thetas+np.pi*2/3)-RA*np.cos(self.Theta.reshape(-1,1)+np.pi*2/3)
+#         Y4 = self.R*np.sin(thetas+np.pi*2/3)-RA*np.sin(self.Theta.reshape(-1,1)+np.pi*2/3)
+#         X5 = self.R*np.cos(thetas-np.pi*2/3)-RA*np.cos(self.Theta.reshape(-1,1)-np.pi*2/3)
+#         Y5 = self.R*np.sin(thetas-np.pi*2/3)-RA*np.sin(self.Theta.reshape(-1,1)-np.pi*2/3)
+#         X6 = self.R*np.cos(thetas+np.pi)-RA*np.cos(self.Theta.reshape(-1,1)+np.pi)
+#         Y6 = self.R*np.sin(thetas+np.pi)-RA*np.sin(self.Theta.reshape(-1,1)+np.pi)
+        
+        
+        #GEAR 3
+        thetas = np.linspace(-np.pi/6,np.pi/6,self.N_body).reshape(1,-1)+self.Theta.reshape(-1,1)
+        RA = np.array(self.R).reshape(-1,1)
+        
+        X1 = -RA*np.cos(thetas)+2/np.sqrt(3)*self.R*np.cos(self.Theta.reshape(-1,1))
+        Y1 = -RA*np.sin(thetas)+2/np.sqrt(3)*self.R*np.sin(self.Theta.reshape(-1,1))
+        Y1 = -RA*np.sin(thetas)+2/np.sqrt(3)*self.R*np.sin(self.Theta.reshape(-1,1))
+        X2 = -RA*np.cos(thetas+np.pi*2/3)+2/np.sqrt(3)*self.R*np.cos(self.Theta.reshape(-1,1)+np.pi*2/3)
+        Y2 = -RA*np.sin(thetas+np.pi*2/3)+2/np.sqrt(3)*self.R*np.sin(self.Theta.reshape(-1,1)+np.pi*2/3)
+        X3 = -RA*np.cos(thetas-np.pi*2/3)+2/np.sqrt(3)*self.R*np.cos(self.Theta.reshape(-1,1)-np.pi*2/3)
+        Y3 = -RA*np.sin(thetas-np.pi*2/3)+2/np.sqrt(3)*self.R*np.sin(self.Theta.reshape(-1,1)-np.pi*2/3)
+        centerX = np.concatenate([X1,X2,X3],axis=1)
+        centerY = np.concatenate([Y1,Y2,Y3],axis=1)
+        
+        
+        
+        # print(centerX.shape)
+
+        # pointX = (self.X.reshape(-1,1)+centerX).reshape(-1)
+        # pointY = (self.Y.reshape(-1,1)+centerY).reshape(-1)
+        return (centerX,centerY)
 
 
 #         for nn in trange(N_iter):
