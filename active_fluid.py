@@ -8,7 +8,7 @@ import sys
 
 
 
-class active_fluid:     # OOP
+class active_fluid:
     """basic model to simulate active RTP + Noise fluid interacting with passive object"""
 
      # initializing coefficients of model and configuration of states in phase space
@@ -86,7 +86,7 @@ class active_fluid:     # OOP
 
     def force(self):
 
-        # axis 0 for active, axis 1 for passive, axis 3 for bodies in passive object
+        # axis 0 for active, axis 1 for passive, axis 2 for bodies in passive object
 
         # for 2 passive particles fixed
         x     = self.x.reshape(-1,1,1)
@@ -111,7 +111,7 @@ class active_fluid:     # OOP
         direcY = (centerY-rel_y)/length
 
         interact = (length<self.Rb)  # boolean 
-        strengthX = self.lamb*interact*direcX*(self.Rb-length)
+        strengthX = self.lamb*interact*direcX*(self.Rb-length)    # harmonic potential
         strengthY = self.lamb*interact*direcY*(self.Rb-length)
 
         F_active  = (-np.sum(np.sum(strengthX,axis=2),axis=1),-np.sum(np.sum(strengthY,axis=2),axis=1))      #sum over bodies, sum over objects
@@ -158,7 +158,10 @@ class active_fluid:     # OOP
         # passive object
 #         self.X           += self.dt*self.mu_T*F_passive[0]
 #         self.Y           += self.dt*self.mu_T*F_passive[1]
-        self.Theta       += self.dt*self.mu_R*torque
+        if self.dynamic:
+            self.Theta       += self.dt*self.mu_R*torque   # overdamped dynamics
+        else:
+            #protocol for perturbation, measure torque in time
 
         # periodic boundary
         self.x,self.y = self.periodic(self.x,self.y)
@@ -174,7 +177,7 @@ class active_fluid:     # OOP
         return traj
 
 
-    def config(self):
+    def config(self):    #gives position of body particles given angle
         
 #         axrange = [-self.L/2, self.L/2, -self.L/2, self.L/2]
 
