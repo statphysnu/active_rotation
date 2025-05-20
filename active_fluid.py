@@ -13,11 +13,11 @@ class active_fluid:     # OOP
 
      # initializing coefficients of model and configuration of states in phase space
 
-    def __init__(self,alpha=1, u=10,Fs=100, N_ptcl=40000,N_passive = 1, mu=1,Dt = 1):
+    def __init__(self,alpha=1, u=10,Fs=100, N_ptcl=40000,N_passive = 1, mu=1,Dt = 1,Dr=1):
 
-        self.initial_state = (alpha,u,Fs,N_ptcl,mu,Dt)    # recording initial state
+        self.initial_state = (alpha,u,Fs,N_ptcl,mu,Dt,Dr)    # recording initial state
          # coefficients
-        self.set_coeff(alpha,u,Fs,N_ptcl,mu,Dt) 
+        self.set_coeff(alpha,u,Fs,N_ptcl,mu,Dt,Dr) 
 
          # check the validity
         self.check_coeff()  
@@ -29,13 +29,14 @@ class active_fluid:     # OOP
 
 
      # setting coefficients
-    def set_coeff(self,alpha=1, u=10,Fs=100, N_ptcl=40000,N_passive = 1, mu=1,Dt = 1):
+    def set_coeff(self,alpha=1, u=10,Fs=100, N_ptcl=40000,N_passive = 1, mu=1,Dt = 1,Dr=1):
         self.alpha = alpha                       # rate of tumble (/time dimension)
         self.u = u                               # velocity of active particle
         self.Fs = Fs                             # number of simulation in unit time
         self.dt = 1/self.Fs
         self.N_ptcl = N_ptcl
         self.Dt = Dt
+        self.Dr = Dr
         self.mu = mu
 
 
@@ -159,7 +160,8 @@ class active_fluid:     # OOP
 
         # active fluid
         # self.theta       +=  np.sqrt(2*self.Dt*self.dt)*np.random.normal(0,1,self.N_ptcl)    # thermal noise
-        self.theta       +=  np.random.uniform(-np.pi, np.pi,self.N_ptcl)*self.tumble()      # tumbling noise
+        # self.theta       +=  np.random.uniform(-np.pi, np.pi,self.N_ptcl)*self.tumble()      # tumbling noise
+        self.theta       += np.sqrt(2*self.Dr*self.dt)*np.random.normal(0,1,self.N_ptcl)     # ABP noise
         self.x           +=  self.dt*(self.u*(np.cos(self.theta))+self.mu*F_active[0])       # deterministic
         self.x           +=  np.sqrt(2*self.Dt*self.dt)*np.random.normal(0,1,self.N_ptcl)    # thermal noise
         self.y           +=  self.dt*(self.u*(np.sin(self.theta))+self.mu*F_active[1])       # deterministic
