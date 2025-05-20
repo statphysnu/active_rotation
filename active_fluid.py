@@ -40,6 +40,9 @@ class active_fluid:     # OOP
         self.mu = mu
 
 
+        self.mode='free'
+        self.omega=0
+        
         # field and potential force
         self.L= 50        
         self.F=4              # just give potential of fixed value for now
@@ -171,11 +174,14 @@ class active_fluid:     # OOP
 #         print(type(self.X))
 #         self.X           += self.dt*self.mu_T*F_passive[0]
 #         self.Y           += self.dt*self.mu_T*F_passive[1]
-        self.Theta       += self.dt*self.mu_R*torque
-
+        if self.mode=='free':
+            self.Theta       += self.dt*self.mu_R*torque
+        elif self.mode=='forced':
+            self.Theta       += self.dt*self.omega
         # periodic boundary
         self.x,self.y = self.periodic(self.x,self.y)
         self.X,self.Y = self.periodic(self.X,self.Y)
+        return(torque)
 
     def simulate(self,N_iter):
         traj = np.empty([self.N_passive,3,N_iter])
